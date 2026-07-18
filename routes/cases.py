@@ -1,6 +1,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from db.connection import query
+from agents.pipeline import run_pipeline
 
 cases_bp = Blueprint("cases", __name__)
 
@@ -48,6 +49,15 @@ def case_detail(case_id):
         draft=draft[0] if draft else None,
         denial=denial[0] if denial else None,
     )
+
+
+@cases_bp.route("/case/<case_id>/process", methods=["POST"])
+def process_case(case_id):
+    """Runs a pending case through extraction -> policy check -> draft.
+    Deterministic escalation on any failure; see agents/pipeline.py."""
+    result = run_pipeline(case_id)
+    flash(result.get("message", "Pipeline finished."))
+    return redirect(url_for("cases.case_detail", case_id=case_id))
 
 
 @cases_bp.route("/case/<case_id>/approve", methods=["POST"])

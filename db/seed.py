@@ -56,31 +56,53 @@ def run():
         dict(patient_name="M. Alvarez", patient_age=54,
              service_description="Biologic infusion, remicade",
              procedure_code="J1745", diagnosis_code="M06.9",
+             service_category="biologic_infusion",
              payer_name="Aetna PPO", appointment_date=today + timedelta(days=16),
              urgency_tier="routine", status="needs_review"),
         dict(patient_name="R. Kim", patient_age=61,
              service_description="MRI lumbar spine",
              procedure_code="72148", diagnosis_code="M54.16",
+             service_category="imaging_mri",
+             chart_note_text=(
+                 "Patient reports 8 weeks of lower back pain radiating to left leg. "
+                 "Conservative treatment attempted: physical therapy 2x/week for 6 "
+                 "weeks, plus NSAIDs (ibuprofen 600mg) with minimal improvement. "
+                 "Straight leg raise positive on left. Ordering physician: Dr. A. "
+                 "Reyes, NPI 9876543210. Requesting MRI lumbar spine to evaluate for "
+                 "disc herniation prior to specialist referral."
+             ),
              payer_name="Aetna PPO", appointment_date=today + timedelta(days=3),
              urgency_tier="urgent", status="pending"),
         dict(patient_name="J. Patel", patient_age=47,
              service_description="Physical therapy, 12 visits",
              procedure_code="97110", diagnosis_code="M25.561",
+             service_category="physical_therapy",
+             chart_note_text=(
+                 "Patient presents with right knee pain following a meniscus strain, "
+                 "diagnosis M25.561. No prior physical therapy for this episode. "
+                 "Ordering physician recommends an initial course of physical "
+                 "therapy, 12 visits, to improve range of motion and reduce pain "
+                 "prior to considering further intervention. Ordering physician: "
+                 "Dr. L. Chen, NPI 1122334455."
+             ),
              payer_name="Cigna", appointment_date=today + timedelta(days=10),
              urgency_tier="routine", status="pending"),
         dict(patient_name="D. Nguyen", patient_age=39,
              service_description="CT abdomen w/ contrast",
              procedure_code="74177", diagnosis_code="R10.9",
+             service_category="imaging_ct",
              payer_name="UnitedHealthcare", appointment_date=today + timedelta(days=7),
              urgency_tier="routine", status="needs_review"),
         dict(patient_name="S. Brooks", patient_age=58,
              service_description="Biologic infusion, missing clinical notes",
              procedure_code="J1745", diagnosis_code="M06.9",
+             service_category="biologic_infusion",
              payer_name="Aetna PPO", appointment_date=today + timedelta(days=5),
              urgency_tier="urgent", status="escalated"),
         dict(patient_name="A. Ferreira", patient_age=44,
              service_description="Biologic infusion, remicade",
              procedure_code="J1745", diagnosis_code="M06.9",
+             service_category="biologic_infusion",
              payer_name="Aetna PPO", appointment_date=today - timedelta(days=2),
              urgency_tier="routine", status="submitted"),
     ]
@@ -90,11 +112,12 @@ def run():
         cid = str(uuid.uuid4())
         cur.execute(
             """INSERT INTO cases (id, patient_name, patient_age, service_description,
-               procedure_code, diagnosis_code, payer_name, appointment_date,
-               urgency_tier, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+               procedure_code, diagnosis_code, service_category, chart_note_text,
+               payer_name, appointment_date, urgency_tier, status)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (cid, c["patient_name"], c["patient_age"], c["service_description"],
-             c["procedure_code"], c["diagnosis_code"], c["payer_name"],
+             c["procedure_code"], c["diagnosis_code"], c["service_category"],
+             c.get("chart_note_text"), c["payer_name"],
              c["appointment_date"], c["urgency_tier"], c["status"]),
         )
         case_ids[c["patient_name"]] = cid

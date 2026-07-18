@@ -4,6 +4,17 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Drop existing tables — safe to rerun during prototyping since this schema
+-- is documented to hold synthetic data only. Order doesn't matter (CASCADE).
+DROP TABLE IF EXISTS metrics_snapshot CASCADE;
+DROP TABLE IF EXISTS denials CASCADE;
+DROP TABLE IF EXISTS drafts CASCADE;
+DROP TABLE IF EXISTS policy_check_results CASCADE;
+DROP TABLE IF EXISTS policies CASCADE;
+DROP TABLE IF EXISTS extracted_fields CASCADE;
+DROP TABLE IF EXISTS case_events CASCADE;
+DROP TABLE IF EXISTS cases CASCADE;
+
 -- ---------------------------------------------------------------------------
 -- cases: one row per prior authorization request, from scheduling to close
 -- ---------------------------------------------------------------------------
@@ -14,6 +25,8 @@ CREATE TABLE cases (
     service_description VARCHAR(255)    NOT NULL,
     procedure_code      VARCHAR(20),                -- CPT / HCPCS
     diagnosis_code      VARCHAR(20),                -- ICD-10
+    service_category    VARCHAR(120),                -- matches policies.service_category
+    chart_note_text     TEXT,                        -- raw intake note fed to the extraction agent
     payer_name          VARCHAR(120)    NOT NULL,
     appointment_date    DATE,
     urgency_tier        VARCHAR(20)     NOT NULL DEFAULT 'routine'

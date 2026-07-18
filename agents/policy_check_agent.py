@@ -9,7 +9,7 @@ score or free-text judgment.
 """
 import json
 
-from agents.claude_client import call_claude
+from agents.claude_client import call_claude, parse_json_array
 
 SYSTEM_PROMPT = """You check whether extracted clinical fields satisfy a \
 payer's prior authorization policy rules. You will be given the extracted \
@@ -22,10 +22,8 @@ and "notes" (one sentence). No prose, no markdown fences."""
 def check_policy(extracted_fields: list[dict], policy_rules: list[dict]) -> list[dict]:
     payload = json.dumps({"extracted_fields": extracted_fields, "rules": policy_rules})
     raw = call_claude(SYSTEM_PROMPT, payload)
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return []
+    result = parse_json_array(raw)
+    return result if result is not None else []
 
 
 def any_rule_failed(results: list[dict]) -> bool:

@@ -6,9 +6,7 @@ Deliberately narrow: this agent only extracts. It does not judge whether
 the case meets payer policy (that's policy_check_agent) and does not
 write the submission (that's draft_agent).
 """
-import json
-
-from agents.claude_client import call_claude
+from agents.claude_client import call_claude, parse_json_array
 
 SYSTEM_PROMPT = """You extract structured fields from clinical chart notes \
 for prior authorization requests. Return ONLY a JSON array of objects, each \
@@ -19,9 +17,7 @@ rather than guessing."""
 
 def extract_fields(chart_note_text: str) -> list[dict]:
     raw = call_claude(SYSTEM_PROMPT, chart_note_text)
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        # Malformed model output should surface as a review case, not crash
-        # the pipeline. Calling code should log this and route to escalation.
-        return []
+    # Malformed model output surfaces as a review case, not a crash — the
+    # pipeline routes an empty result to escalation.
+    result = parse_json_array(raw)
+    return result if result is not None else []

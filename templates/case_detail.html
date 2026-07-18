@@ -25,10 +25,20 @@
       <table>
         <tr><td>Patient</td><td>{{ case.patient_name }}, {{ case.patient_age }}</td></tr>
         <tr><td>Service</td><td>{{ case.service_description }}</td></tr>
+        {% if case.service_category %}
+        <tr><td>Category</td><td>{{ case.service_category | replace('_', ' ') | capitalize }}</td></tr>
+        {% endif %}
         <tr><td>Payer</td><td>{{ case.payer_name }}</td></tr>
         <tr><td>Appointment</td><td>{{ case.appointment_date }}</td></tr>
       </table>
     </div>
+
+    {% if case.chart_note_text %}
+    <div class="card">
+      <h2>Intake note</h2>
+      <p style="font-size:13px;color:var(--text-muted);white-space:pre-wrap;">{{ case.chart_note_text }}</p>
+    </div>
+    {% endif %}
 
     <div class="card">
       <h2>Extracted fields</h2>
@@ -76,6 +86,12 @@
           <button type="submit" style="width:100%;">File formal appeal</button>
         </form>
       </div>
+    </div>
+    {% elif case.status == 'pending' %}
+    <div class="actions">
+      <form method="post" action="{{ url_for('cases.process_case', case_id=case.id) }}" style="flex:1;">
+        <button type="submit" class="btn-primary" style="width:100%;">Run intake pipeline</button>
+      </form>
     </div>
     {% else %}
     <div class="actions">
