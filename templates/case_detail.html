@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head><title>Case detail</title></head>
+<body>
+  {% if case %}
+  <h1>Case: {{ case.patient_name }} — {{ case.service_description }}</h1>
+  <p>Payer: {{ case.payer_name }} | Status: {{ case.status }}</p>
+
+  <h2>Extracted fields</h2>
+  <ul>
+    {% for f in fields %}
+    <li>{{ f.field_name }}: {{ f.field_value }} ({{ f.source_note }})</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Policy check</h2>
+  <ul>
+    {% for r in policy_results %}
+    <li>{{ r.rule_name }} — {{ 'PASS' if r.passed else 'FAIL' }}: {{ r.notes }}</li>
+    {% endfor %}
+  </ul>
+
+  {% if draft %}
+  <h2>Draft submission (v{{ draft.version }})</h2>
+  <p>{{ draft.draft_text }}</p>
+  {% endif %}
+
+  <form method="post" action="/case/{{ case.id }}/approve">
+    <button type="submit">Approve and submit</button>
+  </form>
+  <form method="post" action="/case/{{ case.id }}/escalate">
+    <button type="submit">Escalate</button>
+  </form>
+  {% else %}
+  <p>Case not found.</p>
+  {% endif %}
+</body>
+</html>

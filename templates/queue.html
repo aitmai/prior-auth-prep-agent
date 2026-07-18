@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head><title>PA prep — review queue</title></head>
+<body>
+  <h1>Prior authorization review queue</h1>
+  {% if metrics %}
+  <p>Avg min/case: {{ metrics.avg_minutes_per_case }} |
+     Escalation rate: {{ metrics.escalation_rate }}% |
+     Completed: {{ metrics.cases_completed }}</p>
+  {% endif %}
+  <table border="1" cellpadding="6">
+    <tr><th>Patient</th><th>Service</th><th>Urgency</th><th>Status</th></tr>
+    {% for c in cases %}
+    <tr>
+      <td><a href="/case/{{ c.id }}">{{ c.patient_name }}</a></td>
+      <td>{{ c.service_description }}</td>
+      <td>{{ c.urgency_tier }}</td>
+      <td>{{ c.status }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>
