@@ -1,38 +1,93 @@
-<!doctype html>
-<html>
-<head><title>Case detail</title></head>
-<body>
-  {% if case %}
-  <h1>Case: {{ case.patient_name }} — {{ case.service_description }}</h1>
-  <p>Payer: {{ case.payer_name }} | Status: {{ case.status }}</p>
+{% extends "base.html" %}
+{% block title %}Case — Prior auth prep{% endblock %}
+{% block content %}
 
-  <h2>Extracted fields</h2>
-  <ul>
-    {% for f in fields %}
-    <li>{{ f.field_name }}: {{ f.field_value }} ({{ f.source_note }})</li>
-    {% endfor %}
-  </ul>
+<a class="back-link" href="{{ url_for('cases.queue') }}">&larr; Back to queue</a>
 
-  <h2>Policy check</h2>
-  <ul>
-    {% for r in policy_results %}
-    <li>{{ r.rule_name }} — {{ 'PASS' if r.passed else 'FAIL' }}: {{ r.notes }}</li>
-    {% endfor %}
-  </ul>
+{% if not case %}
+<p>Case not found.</p>
+{% else %}
 
-  {% if draft %}
-  <h2>Draft submission (v{{ draft.version }})</h2>
-  <p>{{ draft.draft_text }}</p>
-  {% endif %}
+<h1 style="font-size:18px;margin:0 0 16px;">
+  {{ case.patient_name }}
+  <span class="badge
+    {% if case.status == 'escalated' %}badge-escalated
+    {% elif case.status == 'submitted' %}badge-submitted
+    {% elif case.status == 'needs_review' %}badge-review
+    {% else %}badge-routine{% endif %}">
+    {{ case.status | replace('_', ' ') | capitalize }}
+  </span>
+</h1>
 
-  <form method="post" action="/case/{{ case.id }}/approve">
-    <button type="submit">Approve and submit</button>
-  </form>
-  <form method="post" action="/case/{{ case.id }}/escalate">
-    <button type="submit">Escalate</button>
-  </form>
-  {% else %}
-  <p>Case not found.</p>
-  {% endif %}
-</body>
-</html>
+<div class="detail-grid">
+  <div>
+    <div class="card">
+      <table>
+        <tr><td>Patient</td><td>{{ case.patient_name }}, {{ case.patient_age }}</td></tr>
+        <tr><td>Service</td><td>{{ case.service_description }}</td></tr>
+        <tr><td>Payer</td><td>{{ case.payer_name }}</td></tr>
+        <tr><td>Appointment</td><td>{{ case.appointment_date }}</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Extracted fields</h2>
+      {% for f in fields %}
+      <div class="field-row"><span class="check">&#10003;</span>{{ f.field_name }}: {{ f.field_value }}</div>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:13px;">No fields extracted yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Policy check</h2>
+      {% for r in policy_results %}
+      <div class="field-row">
+        <span class="{{ 'check' if r.passed else 'cross' }}">{{ '✓' if r.passed else '✗' }}</span>
+        {{ r.rule_name | replace('_', ' ') | capitalize }} — {{ r.notes }}
+      </div>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:13px;">No policy check run yet.</p>
+      {% endfor %}
+    </div>
+
+    {% if draft %}
+    <div class="card">
+      <h2>Draft submission (v{{ draft.version }})</h2>
+      <textarea class="draft" readonly>{{ draft.draft_text }}</textarea>
+    </div>
+    {% endif %}
+
+    {% if denial %}
+    <div class="card">
+      <h2>Denial</h2>
+      <p style="font-size:13px;margin:0 0 8px;">{{ denial.reason_text }}</p>
+      <div class="deadline-banner">
+        <span>Appeal deadline</span>
+        <strong>{{ denial.appeal_deadline }}</strong>
+      </div>
+      <div class="actions">
+        <form method="post" action="{{ url_for('cases.resubmit', case_id=case.id) }}" style="flex:1;">
+          <button type="submit" class="btn-primary" style="width:100%;">Resubmit</button>
+        </form>
+        <form method="post" action="{{ url_for('cases.file_appeal', case_id=case.id) }}" style="flex:1;">
+          <button type="submit" style="width:100%;">File formal appeal</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="actions">
+      <form method="post" action="{{ url_for('cases.approve_and_submit', case_id=case.id) }}" style="flex:1;">
+        <button type="submit" class="btn-primary" style="width:100%;">Approve and submit</button>
+      </form>
+      <form method="post" action="{{ url_for('cases.escalate', case_id=case.id) }}" style="flex:1;">
+        <button type="submit" class="btn-danger" style="width:100%;">Escalate</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

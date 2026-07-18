@@ -1,23 +1,47 @@
-<!doctype html>
-<html>
-<head><title>PA prep — review queue</title></head>
-<body>
-  <h1>Prior authorization review queue</h1>
-  {% if metrics %}
-  <p>Avg min/case: {{ metrics.avg_minutes_per_case }} |
-     Escalation rate: {{ metrics.escalation_rate }}% |
-     Completed: {{ metrics.cases_completed }}</p>
-  {% endif %}
-  <table border="1" cellpadding="6">
-    <tr><th>Patient</th><th>Service</th><th>Urgency</th><th>Status</th></tr>
-    {% for c in cases %}
-    <tr>
-      <td><a href="/case/{{ c.id }}">{{ c.patient_name }}</a></td>
-      <td>{{ c.service_description }}</td>
-      <td>{{ c.urgency_tier }}</td>
-      <td>{{ c.status }}</td>
-    </tr>
+{% extends "base.html" %}
+{% block title %}Queue — Prior auth prep{% endblock %}
+{% block content %}
+
+{% if metrics %}
+<div class="metrics-row">
+  <div class="metric-card">
+    <p class="label">Avg min / case</p>
+    <p class="value">{{ metrics.avg_minutes_per_case }}</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Escalation rate</p>
+    <p class="value">{{ metrics.escalation_rate }}%</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Completion rate</p>
+    <p class="value">{{ metrics.completion_rate }}%</p>
+  </div>
+  <div class="metric-card">
+    <p class="label">Completed today</p>
+    <p class="value">{{ metrics.cases_completed }}</p>
+  </div>
+</div>
+{% endif %}
+
+<div class="queue-columns">
+  {% for status, label, badge_class in [
+      ('pending', 'Pending', 'badge-routine'),
+      ('needs_review', 'Needs review', 'badge-review'),
+      ('escalated', 'Escalated', 'badge-escalated'),
+      ('submitted', 'Submitted', 'badge-submitted')
+  ] %}
+  <div class="queue-column">
+    <h3>{{ label }} ({{ cases | selectattr('status', 'equalto', status) | list | length }})</h3>
+    {% for c in cases if c.status == status %}
+    <a class="case-card" href="{{ url_for('cases.case_detail', case_id=c.id) }}">
+      <p class="title">{{ c.patient_name }}</p>
+      <p class="subtitle">{{ c.service_description }}</p>
+      <span class="badge {{ 'badge-urgent' if c.urgency_tier == 'urgent' else 'badge-routine' }}">
+        {{ c.urgency_tier | capitalize }}
+      </span>
+    </a>
     {% endfor %}
-  </table>
-</body>
-</html>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

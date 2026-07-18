@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from db.connection import query
 
@@ -35,12 +35,18 @@ def case_detail(case_id):
     draft = query(
         "SELECT * FROM drafts WHERE case_id = %s ORDER BY version DESC LIMIT 1", (case_id,)
     )
+    denial = query(
+        "SELECT * FROM denials WHERE case_id = %s AND resolved_at IS NULL "
+        "ORDER BY denied_at DESC LIMIT 1",
+        (case_id,),
+    )
     return render_template(
         "case_detail.html",
         case=case[0] if case else None,
         fields=fields,
         policy_results=policy_results,
         draft=draft[0] if draft else None,
+        denial=denial[0] if denial else None,
     )
 
 
@@ -59,7 +65,8 @@ def approve_and_submit(case_id):
         (case_id, request.form.get("actor", "staff:unknown")),
         fetch=False,
     )
-    return jsonify({"status": "submitted"})
+    flash("Submitted to payer.")
+    return redirect(url_for("cases.queue"))
 
 
 @cases_bp.route("/case/<case_id>/escalate", methods=["POST"])
@@ -76,7 +83,8 @@ def escalate(case_id):
          request.form.get("reason", "Escalated for review")),
         fetch=False,
     )
-    return jsonify({"status": "escalated"})
+    flash("Case escalated.")
+    return redirect(url_for("cases.queue"))
 
 
 @cases_bp.route("/case/<case_id>/denial/resubmit", methods=["POST"])
@@ -92,7 +100,8 @@ def resubmit(case_id):
         (case_id,),
         fetch=False,
     )
-    return jsonify({"status": "resubmit_pending"})
+    flash("Marked for resubmission.")
+    return redirect(url_for("cases.queue"))
 
 
 @cases_bp.route("/case/<case_id>/denial/appeal", methods=["POST"])
@@ -108,4 +117,5 @@ def file_appeal(case_id):
         (case_id,),
         fetch=False,
     )
-    return jsonify({"status": "appeal_pending"})
+    flash("Formal appeal filed.")
+    return redirect(url_for("cases.queue"))
