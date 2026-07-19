@@ -7,6 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Drop existing tables — safe to rerun during prototyping since this schema
 -- is documented to hold synthetic data only. Order doesn't matter (CASCADE).
 DROP TABLE IF EXISTS metrics_snapshot CASCADE;
+DROP TABLE IF EXISTS scheduled_appointments CASCADE;
 DROP TABLE IF EXISTS denials CASCADE;
 DROP TABLE IF EXISTS drafts CASCADE;
 DROP TABLE IF EXISTS policy_check_results CASCADE;
@@ -135,6 +136,31 @@ CREATE TABLE denials (
 );
 
 CREATE INDEX idx_denials_case_id ON denials(case_id);
+
+-- ---------------------------------------------------------------------------
+-- scheduled_appointments: a MOCK stand-in for a real scheduling/EHR system.
+-- Phase 3 of REAL_WORLD_DESIGN_PLAN.md replaces this with a real hook into
+-- wherever the practice actually schedules appointments; this table exists
+-- only so the New Case form has something realistic to pick from today.
+-- ---------------------------------------------------------------------------
+CREATE TABLE scheduled_appointments (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_name        VARCHAR(120)    NOT NULL,
+    patient_age         INTEGER,
+    service_description VARCHAR(255)    NOT NULL,
+    procedure_code      VARCHAR(20),
+    diagnosis_code      VARCHAR(20),
+    service_category    VARCHAR(120),
+    payer_name          VARCHAR(120)    NOT NULL,
+    appointment_date    DATE,
+    urgency_tier        VARCHAR(20)     NOT NULL DEFAULT 'routine'
+                        CHECK (urgency_tier IN ('routine', 'urgent')),
+    chart_note_text     TEXT,
+    used_at             TIMESTAMPTZ,    -- set once converted into a case
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_scheduled_appointments_used ON scheduled_appointments(used_at);
 
 -- ---------------------------------------------------------------------------
 -- metrics_snapshot: rolling stats for the ROI dashboard

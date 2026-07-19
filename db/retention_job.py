@@ -79,7 +79,7 @@ def run():
         print(f"  {c['id']}  {c['patient_name']!r}  {c['status']}  last updated {c['updated_at']}")
 
     if not args.confirm:
-        print("\nDry run only — pass --confirm to actually delete these cases.")
+        print("\nDry run only - pass --confirm to actually delete these cases.")
         return
 
     delete_cases([c["id"] for c in candidates])

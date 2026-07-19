@@ -5,13 +5,82 @@ from agents.pipeline import run_pipeline
 
 cases_bp = Blueprint("cases", __name__)
 
+# Curated, not comprehensive — real CPT/ICD-10 code sets run into the tens
+# of thousands and nothing in this app has that reference data loaded. This
+# covers the codes already used by the seed data/policies, plus an "Other"
+# fallback on the form for anything not listed.
+PROCEDURE_CODES = [
+    ("J1745", "Biologic infusion, remicade"),
+    ("J0135", "Biologic infusion, humira"),
+    ("72148", "MRI lumbar spine"),
+    ("73721", "MRI lower extremity joint"),
+    ("97110", "Physical therapy, therapeutic exercise"),
+    ("74177", "CT abdomen w/ contrast"),
+    ("71260", "CT chest w/ contrast"),
+]
+DIAGNOSIS_CODES = [
+    ("M06.9", "Rheumatoid arthritis, unspecified"),
+    ("M05.79", "Rheumatoid arthritis with rheumatoid factor, multiple sites"),
+    ("M54.16", "Radiculopathy, lumbar region"),
+    ("M23.51", "Sprain of medial collateral ligament, right knee"),
+    ("M25.561", "Pain in right knee"),
+    ("M54.5", "Low back pain"),
+    ("R10.9", "Unspecified abdominal pain"),
+    ("R91.8", "Other nonspecific abnormal finding of lung field"),
+]
+
+
+def _resolve_choice(form, field, other_field):
+    """Server-side resolution of a <select> + free-text 'Other' pair — no
+    JS needed. The custom text field wins if filled in; otherwise the
+    select's value is used unless it's the '__other__' placeholder."""
+    other = (form.get(other_field) or "").strip()
+    if other:
+        return other
+    val = form.get(field, "")
+    return val if val and val != "__other__" else None
+
+
+def _payer_and_category_options():
+    known = query(
+        "SELECT DISTINCT payer_name, service_category FROM policies ORDER BY payer_name, service_category"
+    )
+    payers = sorted({k["payer_name"] for k in known})
+    categories = sorted({k["service_category"] for k in known})
+    return payers, categories
+
+
+def _case_form_context(**overrides):
+    payers, categories = _payer_and_category_options()
+    context = dict(
+        payers=payers,
+        categories=categories,
+        procedure_codes=PROCEDURE_CODES,
+        procedure_code_values=[c for c, _ in PROCEDURE_CODES],
+        diagnosis_codes=DIAGNOSIS_CODES,
+        diagnosis_code_values=[c for c, _ in DIAGNOSIS_CODES],
+        appointments=[],
+        prefill_appointment_id=None,
+    )
+    context.update(overrides)
+    return context
+
 
 @cases_bp.route("/case/new", methods=["GET", "POST"])
 def new_case():
     """Manual case intake — the only way today a case enters the pipeline
     besides db/seed.py. Always creates status='pending'; running the
-    pipeline itself stays a separate, human-triggered step."""
+    pipeline itself stays a separate, human-triggered step. Can optionally
+    pre-fill from a mock scheduled_appointments row (see schema.sql — a
+    stand-in for real Phase 3 EHR/scheduling integration)."""
     if request.method == "POST":
+        patient_name = request.form.get("patient_name", "").strip()
+        service_description = request.form.get("service_description", "").strip()
+        payer_name = _resolve_choice(request.form, "payer_name", "payer_name_other")
+        if not patient_name or not service_description or not payer_name:
+            flash("Patient name, service description, and payer are required.")
+            return redirect(url_for("cases.new_case"))
+
         result = query(
             """INSERT INTO cases (patient_name, patient_age, service_description,
                procedure_code, diagnosis_code, service_category, chart_note_text,
@@ -19,14 +88,14 @@ def new_case():
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
                RETURNING id""",
             (
-                request.form["patient_name"],
+                patient_name,
                 request.form.get("patient_age") or None,
-                request.form["service_description"],
-                request.form.get("procedure_code") or None,
-                request.form.get("diagnosis_code") or None,
-                request.form.get("service_category") or None,
+                service_description,
+                _resolve_choice(request.form, "procedure_code", "procedure_code_other"),
+                _resolve_choice(request.form, "diagnosis_code", "diagnosis_code_other"),
+                _resolve_choice(request.form, "service_category", "service_category_other"),
                 request.form.get("chart_note_text") or None,
-                request.form["payer_name"],
+                payer_name,
                 request.form.get("appointment_date") or None,
                 request.form.get("urgency_tier", "routine"),
             ),
@@ -38,13 +107,102 @@ def new_case():
             (case_id, request.form.get("actor", "staff:unknown")),
             fetch=False,
         )
+        appointment_id = request.form.get("appointment_id")
+        if appointment_id:
+            query(
+                "UPDATE scheduled_appointments SET used_at = now() WHERE id = %s",
+                (appointment_id,),
+                fetch=False,
+            )
         flash("Case created.")
         return redirect(url_for("cases.case_detail", case_id=case_id))
 
-    known = query(
-        "SELECT DISTINCT payer_name, service_category FROM policies ORDER BY payer_name, service_category"
+    prefill = {}
+    prefill_appointment_id = None
+    from_appointment = request.args.get("from_appointment")
+    if from_appointment:
+        rows = query(
+            "SELECT * FROM scheduled_appointments WHERE id = %s AND used_at IS NULL",
+            (from_appointment,),
+        )
+        if rows:
+            prefill = rows[0]
+            prefill_appointment_id = rows[0]["id"]
+        else:
+            flash("That scheduled appointment is no longer available.")
+
+    appointments = query(
+        "SELECT * FROM scheduled_appointments WHERE used_at IS NULL ORDER BY appointment_date"
     )
-    return render_template("case_new.html", known=known)
+
+    return render_template(
+        "case_form.html",
+        mode="new",
+        case=None,
+        data=prefill,
+        **_case_form_context(appointments=appointments, prefill_appointment_id=prefill_appointment_id),
+    )
+
+
+@cases_bp.route("/case/<case_id>/edit", methods=["GET", "POST"])
+def edit_case(case_id):
+    """Editing is only offered while a case is 'pending' — once extraction/
+    policy check/draft exist, they'd reference stale data if the case's
+    core facts changed underneath them."""
+    rows = query("SELECT * FROM cases WHERE id = %s", (case_id,))
+    if not rows:
+        flash("Case not found.")
+        return redirect(url_for("cases.queue"))
+    case = rows[0]
+    if case["status"] != "pending":
+        flash("Case can only be edited while pending.")
+        return redirect(url_for("cases.case_detail", case_id=case_id))
+
+    if request.method == "POST":
+        patient_name = request.form.get("patient_name", "").strip()
+        service_description = request.form.get("service_description", "").strip()
+        payer_name = _resolve_choice(request.form, "payer_name", "payer_name_other")
+        if not patient_name or not service_description or not payer_name:
+            flash("Patient name, service description, and payer are required.")
+            return redirect(url_for("cases.edit_case", case_id=case_id))
+
+        query(
+            """UPDATE cases SET patient_name = %s, patient_age = %s, service_description = %s,
+               procedure_code = %s, diagnosis_code = %s, service_category = %s,
+               chart_note_text = %s, payer_name = %s, appointment_date = %s,
+               urgency_tier = %s, updated_at = now()
+               WHERE id = %s""",
+            (
+                patient_name,
+                request.form.get("patient_age") or None,
+                service_description,
+                _resolve_choice(request.form, "procedure_code", "procedure_code_other"),
+                _resolve_choice(request.form, "diagnosis_code", "diagnosis_code_other"),
+                _resolve_choice(request.form, "service_category", "service_category_other"),
+                request.form.get("chart_note_text") or None,
+                payer_name,
+                request.form.get("appointment_date") or None,
+                request.form.get("urgency_tier", "routine"),
+                case_id,
+            ),
+            fetch=False,
+        )
+        query(
+            """INSERT INTO case_events (case_id, event_type, actor, description)
+               VALUES (%s, 'human_action', %s, 'Case details edited via form')""",
+            (case_id, request.form.get("actor", "staff:unknown")),
+            fetch=False,
+        )
+        flash("Case updated.")
+        return redirect(url_for("cases.case_detail", case_id=case_id))
+
+    return render_template(
+        "case_form.html",
+        mode="edit",
+        case=case,
+        data=case,
+        **_case_form_context(),
+    )
 
 
 @cases_bp.route("/")

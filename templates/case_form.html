@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit case' if mode == 'edit' else 'New case' }} — Prior auth prep{% endblock %}
+{% block content %}
+
+<a class="back-link" href="{{ url_for('cases.case_detail', case_id=case.id) if mode == 'edit' else url_for('cases.queue') }}">&larr; Back</a>
+
+<h1 style="font-size:18px;margin:0 0 16px;">{{ 'Edit case' if mode == 'edit' else 'New case' }}</h1>
+
+{% if mode == 'new' and appointments %}
+<div class="card">
+  <h2>Load from scheduled appointment</h2>
+  {% for a in appointments %}
+  <a class="case-card" href="{{ url_for('cases.new_case', from_appointment=a.id) }}">
+    <p class="title">{{ a.patient_name }} — {{ a.service_description }}</p>
+    <p class="subtitle">{{ a.payer_name }} · appt {{ a.appointment_date }}</p>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="card">
+  {% if prefill_appointment_id %}
+  <input type="hidden" name="appointment_id" value="{{ prefill_appointment_id }}">
+  {% endif %}
+  <div class="form-row">
+    <label>Patient name</label>
+    <input type="text" name="patient_name" required value="{{ data.patient_name or '' }}">
+  </div>
+  <div class="form-row">
+    <label>Patient age</label>
+    <input type="number" name="patient_age" min="0" max="130" value="{{ data.patient_age or '' }}">
+  </div>
+  <div class="form-row">
+    <label>Service description</label>
+    <input type="text" name="service_description" required value="{{ data.service_description or '' }}"
+           placeholder="e.g. MRI lumbar spine">
+  </div>
+  <div class="form-row">
+    <label>Procedure code (CPT/HCPCS)</label>
+    <select name="procedure_code">
+      <option value="">-- select --</option>
+      {% for code, label in procedure_codes %}
+      <option value="{{ code }}" {{ 'selected' if data.procedure_code == code else '' }}>{{ code }} - {{ label }}</option>
+      {% endfor %}
+      <option value="__other__" {{ 'selected' if data.procedure_code and data.procedure_code not in procedure_code_values else '' }}>Other (type below)</option>
+    </select>
+    <input type="text" name="procedure_code_other" placeholder="Custom procedure code"
+           value="{{ data.procedure_code if data.procedure_code and data.procedure_code not in procedure_code_values else '' }}"
+           style="margin-top:6px;">
+  </div>
+  <div class="form-row">
+    <label>Diagnosis code (ICD-10)</label>
+    <select name="diagnosis_code">
+      <option value="">-- select --</option>
+      {% for code, label in diagnosis_codes %}
+      <option value="{{ code }}" {{ 'selected' if data.diagnosis_code == code else '' }}>{{ code }} - {{ label }}</option>
+      {% endfor %}
+      <option value="__other__" {{ 'selected' if data.diagnosis_code and data.diagnosis_code not in diagnosis_code_values else '' }}>Other (type below)</option>
+    </select>
+    <input type="text" name="diagnosis_code_other" placeholder="Custom diagnosis code"
+           value="{{ data.diagnosis_code if data.diagnosis_code and data.diagnosis_code not in diagnosis_code_values else '' }}"
+           style="margin-top:6px;">
+  </div>
+  <div class="form-row">
+    <label>Service category</label>
+    <select name="service_category">
+      <option value="">-- select --</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if data.service_category == c else '' }}>{{ c | replace('_', ' ') | capitalize }}</option>
+      {% endfor %}
+      <option value="__other__" {{ 'selected' if data.service_category and data.service_category not in categories else '' }}>Other (type below)</option>
+    </select>
+    <input type="text" name="service_category_other" placeholder="Custom category — must match a payer's policy category to pass policy check"
+           value="{{ data.service_category if data.service_category and data.service_category not in categories else '' }}"
+           style="margin-top:6px;">
+  </div>
+  <div class="form-row">
+    <label>Payer</label>
+    <select name="payer_name">
+      <option value="">-- select --</option>
+      {% for p in payers %}
+      <option value="{{ p }}" {{ 'selected' if data.payer_name == p else '' }}>{{ p }}</option>
+      {% endfor %}
+      <option value="__other__" {{ 'selected' if data.payer_name and data.payer_name not in payers else '' }}>Other (type below)</option>
+    </select>
+    <input type="text" name="payer_name_other" placeholder="Custom payer"
+           value="{{ data.payer_name if data.payer_name and data.payer_name not in payers else '' }}"
+           style="margin-top:6px;">
+  </div>
+  <div class="form-row">
+    <label>Appointment date</label>
+    <input type="date" name="appointment_date" value="{{ data.appointment_date or '' }}">
+  </div>
+  <div class="form-row">
+    <label>Urgency</label>
+    <select name="urgency_tier">
+      <option value="routine" {{ 'selected' if not data.urgency_tier or data.urgency_tier == 'routine' else '' }}>Routine</option>
+      <option value="urgent" {{ 'selected' if data.urgency_tier == 'urgent' else '' }}>Urgent</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label>Chart note / referral text</label>
+    <textarea class="draft" name="chart_note_text" style="height:140px;"
+              placeholder="Paste the intake note the extraction agent should read">{{ data.chart_note_text or '' }}</textarea>
+  </div>
+  <div class="actions">
+    <button type="submit" class="btn-primary" style="width:100%;">{{ 'Save changes' if mode == 'edit' else 'Create case' }}</button>
+  </div>
+</form>
+{% endblock %}

@@ -118,6 +118,7 @@
       <form method="post" action="{{ url_for('cases.process_case', case_id=case.id) }}" style="flex:1;">
         <button type="submit" class="btn-primary" style="width:100%;">Run intake pipeline</button>
       </form>
+      <a class="btn" style="flex:1;" href="{{ url_for('cases.edit_case', case_id=case.id) }}">Edit case</a>
     </div>
     {% elif case.status == 'submitted' %}
     <div class="card">

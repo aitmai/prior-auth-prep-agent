@@ -50,21 +50,80 @@ deployed on Render.
 - `.claude/launch.json` added so the Flask dev server can be started via
   the standard `run`/preview tooling (`venv/Scripts/python.exe app.py`,
   port 5000).
+- **Case intake route** — `GET/POST /case/new` (`case_new.html`) creates a
+  real `pending` case (patient info, payer, service category, chart note)
+  through the UI instead of only via `db/seed.py`. Linked from the queue
+  via "+ New case". Stays manually triggered into the pipeline (no
+  auto-run on creation), matching the "nothing proceeds without a human
+  action" pattern used everywhere else.
+- **Editable drafts** — the draft textarea on `case_detail.html` is now
+  editable while a case is `draft_ready`/`needs_review`, saved via
+  `POST /case/<id>/draft/edit` as a new `drafts` version (`edited_by` set).
+  Becomes read-only once submitted, since at that point it's a record of
+  what was actually sent, not something to revise.
+- **Closed the loop on payer decisions** — two new routes:
+  `POST /case/<id>/decision` (on a `submitted` case: approved -> `approved`;
+  denied -> `denied` + creates the `denials` row with reason/appeal
+  deadline) and `POST /case/<id>/denial/resolve` (on a case marked for
+  resubmit/appeal: records `overturned`/`upheld`, sets `denials.resolved_at`
+  + `outcome`, moves the case to `approved` or `closed`). Previously
+  `resubmit`/`appeal` set a path but nothing ever closed the loop.
+- **Phase 1 compliance — started, not finished:**
+  - Code: `case_events` now has a `phi_access` event type, logged on every
+    `case_detail` view (not just writes) — verified writing real rows.
+    `actor` is still `'staff:unknown'` on every one of these until Phase 2
+    auth exists, which limits how useful this audit trail is for now.
+  - Code: `db/retention_job.py` — a dry-run-by-default script that deletes
+    cases (cascading to all child tables) past a retention window; `--days`
+    has no default on purpose, so the actual number has to come from a
+    real compliance decision, not a guess. Not yet wired into a schedule.
+  - Docs (drafts, not final): `docs/compliance/phi_handling_policy.md`,
+    `hipaa_risk_assessment.md` (12 identified risks, explicitly not a
+    certified assessment), `baa_tracking.md` (checklist only — no BAA has
+    actually been executed with Supabase/Render/Anthropic; that needs the
+    practice's own outreach), `data_retention_policy.md`. See
+    `docs/compliance/README.md` for what's real vs. draft here.
+- **Case intake now has a scheduling picker + editing** — a
+  `scheduled_appointments` table (`db/schema.sql`) is a MOCK stand-in for a
+  real EHR/scheduling hook (that's still Phase 3 — this doesn't integrate
+  with anything real). `/case/new` shows unused mock appointments as
+  clickable cards; picking one pre-fills the form via
+  `?from_appointment=<id>` and marks it `used_at` on case creation. Seeded
+  4 mock appointments in `db/seed.py`. New `GET/POST /case/<id>/edit`
+  route lets you correct a case's fields — **only while `status='pending'`**
+  (blocked with a flash message otherwise, since extraction/policy
+  check/draft would reference stale data once the pipeline has run).
+- **Procedure code, diagnosis code, payer, and service category are now
+  dropdowns**, not free text — `templates/case_form.html` (replaces the
+  old `case_new.html`, now shared between new-case and edit-case). Payer
+  and category are backed by real distinct values from `policies`;
+  procedure/diagnosis codes are a curated list of the codes already used
+  in this app's seed data (real CPT/ICD-10 code sets have tens of
+  thousands of entries — nothing here has that reference data loaded).
+  Every dropdown has an "Other (type below)" option with a free-text
+  fallback, resolved server-side in `routes/cases.py: _resolve_choice()`
+  — no JS needed, consistent with the rest of the app.
 - Deployed: app on Render, database on Supabase — **not yet redeployed
-  with today's changes**; Render's `DATABASE_URL` also needs the schema
-  reset applied before the deployed app matches local.
+  with any of today's changes**; Render's `DATABASE_URL` also needs the
+  schema reset applied before the deployed app matches local.
 - A `REAL_WORLD_DESIGN_PLAN.md` exists in this repo mapping the path from
   prototype to a real, compliant, production system
 
-**Pipeline:** appointment scheduled -> case intake -> extraction agent ->
-policy check agent -> draft agent -> human review (approve/escalate) ->
-submitted -> payer decision -> approved or denied -> (if denied) resubmit
-or formal appeal, each with its own status and audit trail.
+**Pipeline:** appointment scheduled (mock picker today, real EHR/scheduling
+hook in Phase 3) -> case intake (create or edit while pending) ->
+extraction agent -> policy check agent -> draft agent -> human review
+(approve/edit/escalate) -> submitted -> payer decision -> approved or
+denied -> (if denied) resubmit or formal appeal -> resolution
+(overturned/upheld), each with its own status and audit trail. This is a
+fully closed loop end to end, verified live in the browser at every step.
 
-**What I want to work on next:** [fill in — e.g. "build a case-intake route
-so new cases can be created through the UI instead of only via seed.py,
-and have it auto-trigger the pipeline" / "build the escalation queue screen
-for supervisors" / "add authentication" / "start on Phase 1 of the
-real-world design plan"]
+**What I want to work on next:** [fill in — e.g. "add authentication
+(Phase 2) — the actor field and phi_access log are close to useless
+without it" / "have the queue view show resubmit_pending/appeal_pending
+cases too, it currently only has 4 columns and those statuses vanish from
+view" / "deploy today's changes to Render + reset the Supabase schema" /
+"keep going on Phase 1 — get the BAAs actually signed, get the risk
+assessment reviewed by someone qualified" / "let staff schedule a new mock
+appointment through the UI instead of only via seed.py"]
 
 Please pick up from here.

@@ -176,6 +176,69 @@ def run():
          today + timedelta(days=6), "resubmit"),
     )
 
+    # ---- mock scheduled appointments (stand-in for a real EHR/scheduling
+    # system — see the comment on scheduled_appointments in schema.sql) -----
+    appointments = [
+        dict(patient_name="K. Whitfield", patient_age=66,
+             service_description="Biologic infusion, humira",
+             procedure_code="J0135", diagnosis_code="M05.79",
+             service_category="biologic_infusion", payer_name="Aetna PPO",
+             appointment_date=today + timedelta(days=12), urgency_tier="routine",
+             chart_note_text=(
+                 "Patient with seropositive rheumatoid arthritis, multiple "
+                 "joints. Completed 4-month methotrexate trial, inadequate "
+                 "response per rheumatology progress note. Ordering "
+                 "physician: Dr. S. Patel, NPI 3344556677. Requesting "
+                 "biologic infusion (adalimumab) per step-therapy policy."
+             )),
+        dict(patient_name="B. Alvarado", patient_age=34,
+             service_description="MRI knee, right",
+             procedure_code="73721", diagnosis_code="M23.51",
+             service_category="imaging_mri", payer_name="Aetna PPO",
+             appointment_date=today + timedelta(days=8), urgency_tier="routine",
+             chart_note_text=(
+                 "Patient with right knee pain and instability x10 weeks "
+                 "following a twisting injury. Completed 6 weeks of physical "
+                 "therapy and NSAIDs with persistent instability on exam. "
+                 "Ordering physician: Dr. M. Alavi, NPI 2233445566. "
+                 "Requesting MRI right knee to evaluate for ligament injury."
+             )),
+        dict(patient_name="N. Osei", patient_age=29,
+             service_description="CT chest w/ contrast",
+             procedure_code="71260", diagnosis_code="R91.8",
+             service_category="imaging_ct", payer_name="UnitedHealthcare",
+             appointment_date=today + timedelta(days=5), urgency_tier="urgent",
+             chart_note_text=(
+                 "Patient with abnormal finding on chest X-ray, indeterminate "
+                 "pulmonary nodule. Ordering physician recommends contrast CT "
+                 "chest for further characterization per ACR appropriateness "
+                 "criteria. Ordering physician: Dr. T. Nakamura, NPI 4455667788."
+             )),
+        dict(patient_name="F. Delgado", patient_age=52,
+             service_description="Physical therapy, 12 visits",
+             procedure_code="97110", diagnosis_code="M54.5",
+             service_category="physical_therapy", payer_name="Cigna",
+             appointment_date=today + timedelta(days=9), urgency_tier="routine",
+             chart_note_text=(
+                 "Patient with chronic low back pain, no prior physical "
+                 "therapy for this episode. Ordering physician recommends an "
+                 "initial course of physical therapy, 12 visits, to reduce "
+                 "pain and improve function. Ordering physician: Dr. J. Wren, "
+                 "NPI 5566778899."
+             )),
+    ]
+    for a in appointments:
+        cur.execute(
+            """INSERT INTO scheduled_appointments (patient_name, patient_age,
+               service_description, procedure_code, diagnosis_code, service_category,
+               payer_name, appointment_date, urgency_tier, chart_note_text)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (a["patient_name"], a["patient_age"], a["service_description"],
+             a["procedure_code"], a["diagnosis_code"], a["service_category"],
+             a["payer_name"], a["appointment_date"], a["urgency_tier"],
+             a["chart_note_text"]),
+        )
+
     # ---- one metrics snapshot for the dashboard -------------------------------
     cur.execute(
         """INSERT INTO metrics_snapshot (snapshot_date, avg_minutes_per_case,
