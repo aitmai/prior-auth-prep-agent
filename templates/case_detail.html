@@ -66,11 +66,20 @@
     {% if draft %}
     <div class="card">
       <h2>Draft submission (v{{ draft.version }})</h2>
+      {% if case.status in ['draft_ready', 'needs_review'] %}
+      <form method="post" action="{{ url_for('cases.edit_draft', case_id=case.id) }}">
+        <textarea class="draft" name="draft_text" style="height:140px;">{{ draft.draft_text }}</textarea>
+        <div class="actions">
+          <button type="submit" style="width:100%;">Save edits</button>
+        </div>
+      </form>
+      {% else %}
       <textarea class="draft" readonly>{{ draft.draft_text }}</textarea>
+      {% endif %}
     </div>
     {% endif %}
 
-    {% if denial %}
+    {% if denial and not denial.resolution_path %}
     <div class="card">
       <h2>Denial</h2>
       <p style="font-size:13px;margin:0 0 8px;">{{ denial.reason_text }}</p>
@@ -87,12 +96,55 @@
         </form>
       </div>
     </div>
+    {% elif denial and denial.resolution_path %}
+    <div class="card">
+      <h2>Awaiting resolution</h2>
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 8px;">
+        Marked for {{ denial.resolution_path }}. Record the payer's final decision.
+      </p>
+      <div class="actions">
+        <form method="post" action="{{ url_for('cases.resolve_denial', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="outcome" value="overturned">
+          <button type="submit" class="btn-primary" style="width:100%;">Overturned</button>
+        </form>
+        <form method="post" action="{{ url_for('cases.resolve_denial', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="outcome" value="upheld">
+          <button type="submit" class="btn-danger" style="width:100%;">Upheld</button>
+        </form>
+      </div>
+    </div>
     {% elif case.status == 'pending' %}
     <div class="actions">
       <form method="post" action="{{ url_for('cases.process_case', case_id=case.id) }}" style="flex:1;">
         <button type="submit" class="btn-primary" style="width:100%;">Run intake pipeline</button>
       </form>
     </div>
+    {% elif case.status == 'submitted' %}
+    <div class="card">
+      <h2>Payer decision</h2>
+      <form method="post" action="{{ url_for('cases.record_decision', case_id=case.id) }}">
+        <input type="hidden" name="decision" value="approved">
+        <button type="submit" class="btn-primary" style="width:100%;">Approved</button>
+      </form>
+      <form method="post" action="{{ url_for('cases.record_decision', case_id=case.id) }}" style="margin-top:12px;">
+        <input type="hidden" name="decision" value="denied">
+        <div class="form-row">
+          <label>Denial reason code</label>
+          <input type="text" name="reason_code" placeholder="e.g. INSUFFICIENT_DOCS">
+        </div>
+        <div class="form-row">
+          <label>Denial reason</label>
+          <input type="text" name="reason_text" placeholder="Why the payer denied this request">
+        </div>
+        <div class="form-row">
+          <label>Appeal deadline</label>
+          <input type="date" name="appeal_deadline">
+        </div>
+        <button type="submit" class="btn-danger" style="width:100%;">Record denial</button>
+      </form>
+    </div>
+    {% elif case.status in ['approved', 'denied', 'closed'] %}
+    <p style="color:var(--text-muted);font-size:13px;">No further action — case is {{ case.status }}.</p>
     {% else %}
     <div class="actions">
       <form method="post" action="{{ url_for('cases.approve_and_submit', case_id=case.id) }}" style="flex:1;">

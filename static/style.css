@@ -220,6 +220,28 @@ button:hover, .btn:hover { border-color: var(--accent); }
   text-decoration: none;
 }
 
+.form-row { margin-bottom: 14px; }
+
+.form-row label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.form-row input,
+.form-row select,
+.form-row textarea {
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
 .deadline-banner {
   background: var(--warning-bg);
   color: var(--warning);

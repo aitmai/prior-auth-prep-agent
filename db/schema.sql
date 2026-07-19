@@ -52,7 +52,7 @@ CREATE TABLE case_events (
     id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     case_id      UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     event_type   VARCHAR(30) NOT NULL
-                 CHECK (event_type IN ('agent_action', 'human_action', 'status_change')),
+                 CHECK (event_type IN ('agent_action', 'human_action', 'status_change', 'phi_access')),
     actor        VARCHAR(60) NOT NULL,   -- e.g. 'extraction_agent', 'staff:jdoe'
     description  TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
