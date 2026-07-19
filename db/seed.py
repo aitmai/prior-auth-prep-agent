@@ -12,6 +12,7 @@ from datetime import date, timedelta
 
 import psycopg2
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 
 load_dotenv()
 
@@ -21,6 +22,21 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 def run():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
+
+    # ---- demo users — LOCAL DEMO ONLY. These are throwaway passwords for
+    # a prototype with no real patients; never reuse this pattern once real
+    # PHI is in play. See docs/compliance/hipaa_risk_assessment.md, risk #1. --
+    users = [
+        ("staff1", "staffdemo123", "staff"),
+        ("supervisor1", "supervisordemo123", "supervisor"),
+        ("admin1", "admindemo123", "admin"),
+    ]
+    for username, password, role in users:
+        cur.execute(
+            """INSERT INTO users (username, password_hash, role)
+               VALUES (%s, %s, %s)""",
+            (username, generate_password_hash(password), role),
+        )
 
     # ---- policies (payer rules) -------------------------------------------------
     policies = [

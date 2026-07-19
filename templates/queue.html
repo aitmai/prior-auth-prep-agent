@@ -32,7 +32,10 @@
       ('pending', 'Pending', 'badge-routine'),
       ('needs_review', 'Needs review', 'badge-review'),
       ('escalated', 'Escalated', 'badge-escalated'),
-      ('submitted', 'Submitted', 'badge-submitted')
+      ('submitted', 'Submitted', 'badge-submitted'),
+      ('denied', 'Denied', 'badge-escalated'),
+      ('resubmit_pending', 'Resubmit pending', 'badge-review'),
+      ('appeal_pending', 'Appeal pending', 'badge-review')
   ] %}
   <div class="queue-column">
     <h3>{{ label }} ({{ cases | selectattr('status', 'equalto', status) | list | length }})</h3>

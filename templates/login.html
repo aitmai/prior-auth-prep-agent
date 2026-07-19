@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Log in — Prior auth prep{% endblock %}
+{% block content %}
+
+<h1 style="font-size:18px;margin:0 0 16px;">Log in</h1>
+
+<form method="post" class="card" style="max-width:360px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-row">
+    <label>Username</label>
+    <input type="text" name="username" required autofocus>
+  </div>
+  <div class="form-row">
+    <label>Password</label>
+    <input type="password" name="password" required>
+  </div>
+  <div class="actions">
+    <button type="submit" class="btn-primary" style="width:100%;">Log in</button>
+  </div>
+</form>
+
+{% if allow_demo_login %}
+<form method="post" action="{{ url_for('auth.demo_login') }}" style="max-width:360px;margin-top:12px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" style="width:100%;">Test without login</button>
+</form>
+<p style="max-width:360px;font-size:12px;color:var(--text-muted);margin-top:8px;">
+  Skips authentication, logs in as the demo staff account. Only available
+  because ALLOW_DEMO_LOGIN is set locally — never enable this on a real
+  deployment.
+</p>
+{% endif %}
+{% endblock %}

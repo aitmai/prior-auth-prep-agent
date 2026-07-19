@@ -1,4 +1,5 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 from db.connection import query
 from agents.pipeline import run_pipeline
@@ -67,6 +68,7 @@ def _case_form_context(**overrides):
 
 
 @cases_bp.route("/case/new", methods=["GET", "POST"])
+@login_required
 def new_case():
     """Manual case intake — the only way today a case enters the pipeline
     besides db/seed.py. Always creates status='pending'; running the
@@ -104,7 +106,7 @@ def new_case():
         query(
             """INSERT INTO case_events (case_id, event_type, actor, description)
                VALUES (%s, 'human_action', %s, 'Case created via intake form')""",
-            (case_id, request.form.get("actor", "staff:unknown")),
+            (case_id, current_user.actor),
             fetch=False,
         )
         appointment_id = request.form.get("appointment_id")
@@ -145,6 +147,7 @@ def new_case():
 
 
 @cases_bp.route("/case/<case_id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_case(case_id):
     """Editing is only offered while a case is 'pending' — once extraction/
     policy check/draft exist, they'd reference stale data if the case's
@@ -190,7 +193,7 @@ def edit_case(case_id):
         query(
             """INSERT INTO case_events (case_id, event_type, actor, description)
                VALUES (%s, 'human_action', %s, 'Case details edited via form')""",
-            (case_id, request.form.get("actor", "staff:unknown")),
+            (case_id, current_user.actor),
             fetch=False,
         )
         flash("Case updated.")
@@ -206,6 +209,7 @@ def edit_case(case_id):
 
 
 @cases_bp.route("/")
+@login_required
 def queue():
     """The review queue dashboard — cases grouped by status, plus the
     metrics_snapshot numbers for the ROI header."""
@@ -220,17 +224,17 @@ def queue():
 
 
 @cases_bp.route("/case/<case_id>")
+@login_required
 def case_detail(case_id):
     case = query("SELECT * FROM cases WHERE id = %s", (case_id,))
     if case:
         # HIPAA audit requirements cover access, not just modification — log
         # every read of a case's PHI here, not only the write actions below.
-        # actor is 'staff:unknown' until real auth exists (see CONTINUE.md);
-        # this log is not yet attributable to a specific person.
+        # Now attributable to a real logged-in user, not a placeholder.
         query(
             """INSERT INTO case_events (case_id, event_type, actor, description)
-               VALUES (%s, 'phi_access', 'staff:unknown', 'Case detail viewed')""",
-            (case_id,),
+               VALUES (%s, 'phi_access', %s, 'Case detail viewed')""",
+            (case_id, current_user.actor),
             fetch=False,
         )
     fields = query(
@@ -262,6 +266,7 @@ def case_detail(case_id):
 
 
 @cases_bp.route("/case/<case_id>/process", methods=["POST"])
+@login_required
 def process_case(case_id):
     """Runs a pending case through extraction -> policy check -> draft.
     Deterministic escalation on any failure; see agents/pipeline.py."""
@@ -271,6 +276,7 @@ def process_case(case_id):
 
 
 @cases_bp.route("/case/<case_id>/draft/edit", methods=["POST"])
+@login_required
 def edit_draft(case_id):
     """Saves a human-edited draft as a new version. Editing is only offered
     in the UI before submission — once approve_and_submit fires, the draft
@@ -279,7 +285,7 @@ def edit_draft(case_id):
         "SELECT version FROM drafts WHERE case_id = %s ORDER BY version DESC LIMIT 1", (case_id,)
     )
     next_version = (latest[0]["version"] + 1) if latest else 1
-    actor = request.form.get("actor", "staff:unknown")
+    actor = current_user.actor
     query(
         """INSERT INTO drafts (case_id, version, draft_text, edited_by)
            VALUES (%s, %s, %s, %s)""",
@@ -297,6 +303,7 @@ def edit_draft(case_id):
 
 
 @cases_bp.route("/case/<case_id>/approve", methods=["POST"])
+@login_required
 def approve_and_submit(case_id):
     """A human clicked 'approve and submit'. Nothing reaches the payer
     without this route being hit by an authenticated staff action."""
@@ -308,7 +315,7 @@ def approve_and_submit(case_id):
     query(
         """INSERT INTO case_events (case_id, event_type, actor, description)
            VALUES (%s, 'human_action', %s, 'Draft approved and submitted to payer')""",
-        (case_id, request.form.get("actor", "staff:unknown")),
+        (case_id, current_user.actor),
         fetch=False,
     )
     flash("Submitted to payer.")
@@ -316,6 +323,7 @@ def approve_and_submit(case_id):
 
 
 @cases_bp.route("/case/<case_id>/escalate", methods=["POST"])
+@login_required
 def escalate(case_id):
     query(
         "UPDATE cases SET status = 'escalated', updated_at = now() WHERE id = %s",
@@ -325,7 +333,7 @@ def escalate(case_id):
     query(
         """INSERT INTO case_events (case_id, event_type, actor, description)
            VALUES (%s, 'human_action', %s, %s)""",
-        (case_id, request.form.get("actor", "staff:unknown"),
+        (case_id, current_user.actor,
          request.form.get("reason", "Escalated for review")),
         fetch=False,
     )
@@ -334,12 +342,13 @@ def escalate(case_id):
 
 
 @cases_bp.route("/case/<case_id>/decision", methods=["POST"])
+@login_required
 def record_decision(case_id):
     """Records the payer's decision on a submitted case. Approved closes the
     loop directly; denied creates the denials row that drives the existing
     resubmit/appeal UI."""
     decision = request.form.get("decision")
-    actor = request.form.get("actor", "staff:unknown")
+    actor = current_user.actor
     if decision == "approved":
         query(
             "UPDATE cases SET status = 'approved', updated_at = now() WHERE id = %s",
@@ -381,12 +390,13 @@ def record_decision(case_id):
 
 
 @cases_bp.route("/case/<case_id>/denial/resolve", methods=["POST"])
+@login_required
 def resolve_denial(case_id):
     """Records the final outcome of a resubmission or appeal — the step
     that was previously missing: resubmit/appeal set a path, but nothing
     ever closed the loop on what the payer ultimately decided."""
     outcome = request.form.get("outcome")
-    actor = request.form.get("actor", "staff:unknown")
+    actor = current_user.actor
     new_status = "approved" if outcome == "overturned" else "closed"
     query(
         """UPDATE denials SET resolved_at = now(), outcome = %s
@@ -410,6 +420,7 @@ def resolve_denial(case_id):
 
 
 @cases_bp.route("/case/<case_id>/denial/resubmit", methods=["POST"])
+@login_required
 def resubmit(case_id):
     query(
         "UPDATE cases SET status = 'resubmit_pending', updated_at = now() WHERE id = %s",
@@ -422,11 +433,18 @@ def resubmit(case_id):
         (case_id,),
         fetch=False,
     )
+    query(
+        """INSERT INTO case_events (case_id, event_type, actor, description)
+           VALUES (%s, 'human_action', %s, 'Marked for resubmission')""",
+        (case_id, current_user.actor),
+        fetch=False,
+    )
     flash("Marked for resubmission.")
     return redirect(url_for("cases.queue"))
 
 
 @cases_bp.route("/case/<case_id>/denial/appeal", methods=["POST"])
+@login_required
 def file_appeal(case_id):
     query(
         "UPDATE cases SET status = 'appeal_pending', updated_at = now() WHERE id = %s",
@@ -437,6 +455,12 @@ def file_appeal(case_id):
         """UPDATE denials SET resolution_path = 'appeal' WHERE case_id = %s
            AND resolved_at IS NULL""",
         (case_id,),
+        fetch=False,
+    )
+    query(
+        """INSERT INTO case_events (case_id, event_type, actor, description)
+           VALUES (%s, 'human_action', %s, 'Formal appeal filed')""",
+        (case_id, current_user.actor),
         fetch=False,
     )
     flash("Formal appeal filed.")

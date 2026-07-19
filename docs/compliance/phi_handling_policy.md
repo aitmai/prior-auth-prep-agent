@@ -31,26 +31,30 @@ See `data_retention_policy.md`.
 
 ## Who can see PHI
 
-Today: anyone who can reach the Flask app, since there is no
-authentication (`CONTINUE.md` documents this gap explicitly). This must be
-resolved — Phase 2 of the design plan — before this policy can claim any
-real access control.
+Real login now exists (`routes/auth.py`, Flask-Login) and every case route
+requires `@login_required` — anonymous access is blocked. There is no
+role-based restriction yet: any logged-in account (`staff`, `supervisor`,
+or `admin`) can see and act on every case identically, since no route
+currently differentiates by role. The 3 seeded accounts
+(`db/seed.py`) use throwaway demo passwords and must never be reused in a
+real deployment — real user provisioning (real people, real passwords, a
+real password policy, ideally MFA) is still outstanding.
 
 ## Audit trail
 
-`case_events` is append-only and now logs both actions (`human_action`,
-`agent_action`, `status_change`) and reads (`phi_access`, added when a case
-detail page is viewed — see `routes/cases.py: case_detail()`). Every
-`phi_access` row currently records `actor = 'staff:unknown'` because there
-is no real authentication yet to attribute the read to a specific person —
-that limitation must be closed by Phase 2 for this audit trail to be
-meaningful for a real HIPAA audit. The review-queue list view
-(`GET /`) also displays PHI (patient name, service description) per row
-and is **not** currently logged per-view; only individual case-detail
-access is logged. This is a known gap, not an oversight — logging every
-queue-list render was judged too noisy to be useful as designed; a future
-pass could log it at a coarser grain (e.g. once per session) if a real
-audit requirement calls for it.
+`case_events` is append-only and logs actions (`human_action`,
+`agent_action`, `status_change`) and reads (`phi_access`, logged when a
+case detail page is viewed — see `routes/cases.py: case_detail()`). Every
+event's `actor` now comes from the logged-in session
+(`current_user.actor`, e.g. `staff:staff1`) rather than an unverified form
+field or a placeholder — this is real progress, but it's only as
+trustworthy as the login itself (see the demo-password caveat above). The
+review-queue list view (`GET /`) also displays PHI (patient name, service
+description) per row and is **not** currently logged per-view; only
+individual case-detail access is logged. This is a known gap, not an
+oversight — logging every queue-list render was judged too noisy to be
+useful as designed; a future pass could log it at a coarser grain (e.g.
+once per session) if a real audit requirement calls for it.
 
 ## Vendors that will handle PHI
 

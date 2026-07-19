@@ -68,6 +68,7 @@
       <h2>Draft submission (v{{ draft.version }})</h2>
       {% if case.status in ['draft_ready', 'needs_review'] %}
       <form method="post" action="{{ url_for('cases.edit_draft', case_id=case.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <textarea class="draft" name="draft_text" style="height:140px;">{{ draft.draft_text }}</textarea>
         <div class="actions">
           <button type="submit" style="width:100%;">Save edits</button>
@@ -89,9 +90,11 @@
       </div>
       <div class="actions">
         <form method="post" action="{{ url_for('cases.resubmit', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn-primary" style="width:100%;">Resubmit</button>
         </form>
         <form method="post" action="{{ url_for('cases.file_appeal', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" style="width:100%;">File formal appeal</button>
         </form>
       </div>
@@ -104,10 +107,12 @@
       </p>
       <div class="actions">
         <form method="post" action="{{ url_for('cases.resolve_denial', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="outcome" value="overturned">
           <button type="submit" class="btn-primary" style="width:100%;">Overturned</button>
         </form>
         <form method="post" action="{{ url_for('cases.resolve_denial', case_id=case.id) }}" style="flex:1;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="outcome" value="upheld">
           <button type="submit" class="btn-danger" style="width:100%;">Upheld</button>
         </form>
@@ -116,6 +121,7 @@
     {% elif case.status == 'pending' %}
     <div class="actions">
       <form method="post" action="{{ url_for('cases.process_case', case_id=case.id) }}" style="flex:1;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn-primary" style="width:100%;">Run intake pipeline</button>
       </form>
       <a class="btn" style="flex:1;" href="{{ url_for('cases.edit_case', case_id=case.id) }}">Edit case</a>
@@ -124,10 +130,12 @@
     <div class="card">
       <h2>Payer decision</h2>
       <form method="post" action="{{ url_for('cases.record_decision', case_id=case.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="decision" value="approved">
         <button type="submit" class="btn-primary" style="width:100%;">Approved</button>
       </form>
       <form method="post" action="{{ url_for('cases.record_decision', case_id=case.id) }}" style="margin-top:12px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="decision" value="denied">
         <div class="form-row">
           <label>Denial reason code</label>
@@ -149,9 +157,11 @@
     {% else %}
     <div class="actions">
       <form method="post" action="{{ url_for('cases.approve_and_submit', case_id=case.id) }}" style="flex:1;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn-primary" style="width:100%;">Approve and submit</button>
       </form>
       <form method="post" action="{{ url_for('cases.escalate', case_id=case.id) }}" style="flex:1;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn-danger" style="width:100%;">Escalate</button>
       </form>
     </div>

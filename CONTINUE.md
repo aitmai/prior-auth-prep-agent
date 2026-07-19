@@ -50,12 +50,12 @@ deployed on Render.
 - `.claude/launch.json` added so the Flask dev server can be started via
   the standard `run`/preview tooling (`venv/Scripts/python.exe app.py`,
   port 5000).
-- **Case intake route** — `GET/POST /case/new` (`case_new.html`) creates a
-  real `pending` case (patient info, payer, service category, chart note)
-  through the UI instead of only via `db/seed.py`. Linked from the queue
-  via "+ New case". Stays manually triggered into the pipeline (no
-  auto-run on creation), matching the "nothing proceeds without a human
-  action" pattern used everywhere else.
+- **Case intake route** — `GET/POST /case/new` (now `case_form.html`,
+  see below) creates a real `pending` case (patient info, payer, service
+  category, chart note) through the UI instead of only via `db/seed.py`.
+  Linked from the queue via "+ New case". Stays manually triggered into
+  the pipeline (no auto-run on creation), matching the "nothing proceeds
+  without a human action" pattern used everywhere else.
 - **Editable drafts** — the draft textarea on `case_detail.html` is now
   editable while a case is `draft_ready`/`needs_review`, saved via
   `POST /case/<id>/draft/edit` as a new `drafts` version (`edited_by` set).
@@ -103,9 +103,47 @@ deployed on Render.
   Every dropdown has an "Other (type below)" option with a free-text
   fallback, resolved server-side in `routes/cases.py: _resolve_choice()`
   — no JS needed, consistent with the rest of the app.
+- **Queue view now shows every actionable status** — `queue.html` had only
+  4 columns (pending, needs_review, escalated, submitted); added `denied`,
+  `resubmit_pending`, `appeal_pending` so those cases don't vanish from
+  view. `approved`/`closed` stay excluded on purpose — genuinely terminal,
+  no action needed.
+- **Real authentication landed (Phase 2, partially)** — `users` table
+  (username/password_hash/role), Flask-Login for sessions, `routes/auth.py`
+  (`/login`, `/logout`), every case route now requires `@login_required`.
+  Every `actor` written to `case_events` (including `phi_access` reads) now
+  comes from the real logged-in session (`current_user.actor`, e.g.
+  `staff:staff1`) instead of an unverified form field or `'staff:unknown'`
+  — verified live: logged in, escalated a case, confirmed the audit row
+  said `staff:staff1`, logged out, confirmed the queue was inaccessible
+  again. Also added Flask-WTF CSRF protection app-wide while touching every
+  form anyway, since the risk assessment flagged CSRF as worse once real
+  sessions exist. Closed a small pre-existing gap found along the way:
+  `resubmit`/`file_appeal` never logged a `case_events` row at all before
+  today. 3 demo accounts seeded in `db/seed.py`
+  (`staff1`/`supervisor1`/`admin1`, throwaway passwords, documented as
+  demo-only, never to reach a real deployment). Updated
+  `hipaa_risk_assessment.md` and `phi_handling_policy.md` to reflect this.
+  **Not done:** `users.role` is captured but nothing enforces a difference
+  by role yet — no admin/supervisor-only action exists to gate. That's
+  Phase 2's RBAC bullet, still open.
+- **"Test without login" button** — `POST /login/demo` (`routes/auth.py`)
+  logs straight in as the `staff1` demo account, no password. Gated behind
+  `ALLOW_DEMO_LOGIN` (`app.py`), which defaults to `false`/unset
+  (`.env.example`) and is only `true` in the local `.env`. Verified live
+  both ways: button + route work when the flag is on, and — with the flag
+  off — the button disappears *and* a direct POST to `/login/demo` still
+  gets rejected (checked via fetch, not just hiding the UI element).
+  Tracked as risk #13 in `hipaa_risk_assessment.md`: this is a full auth
+  bypass if the flag is ever set `true` anywhere real PHI is reachable;
+  recommend removing the route entirely before any real deployment rather
+  than trusting the flag alone.
 - Deployed: app on Render, database on Supabase — **not yet redeployed
   with any of today's changes**; Render's `DATABASE_URL` also needs the
-  schema reset applied before the deployed app matches local.
+  schema reset applied before the deployed app matches local. Also note:
+  deploying auth means setting real values for `SECRET_KEY`, replacing the
+  demo user passwords, and making sure `ALLOW_DEMO_LOGIN` is never set on
+  Render — before this is anything but a local prototype.
 - A `REAL_WORLD_DESIGN_PLAN.md` exists in this repo mapping the path from
   prototype to a real, compliant, production system
 
@@ -114,16 +152,17 @@ hook in Phase 3) -> case intake (create or edit while pending) ->
 extraction agent -> policy check agent -> draft agent -> human review
 (approve/edit/escalate) -> submitted -> payer decision -> approved or
 denied -> (if denied) resubmit or formal appeal -> resolution
-(overturned/upheld), each with its own status and audit trail. This is a
-fully closed loop end to end, verified live in the browser at every step.
+(overturned/upheld), each with its own status and audit trail, all behind
+a real login now. This is a fully closed loop end to end, verified live in
+the browser at every step.
 
-**What I want to work on next:** [fill in — e.g. "add authentication
-(Phase 2) — the actor field and phi_access log are close to useless
-without it" / "have the queue view show resubmit_pending/appeal_pending
-cases too, it currently only has 4 columns and those statuses vanish from
-view" / "deploy today's changes to Render + reset the Supabase schema" /
-"keep going on Phase 1 — get the BAAs actually signed, get the risk
-assessment reviewed by someone qualified" / "let staff schedule a new mock
-appointment through the UI instead of only via seed.py"]
+**What I want to work on next:** [fill in — e.g. "enforce RBAC — restrict
+some action to supervisor/admin roles now that users.role actually exists"
+/ "deploy today's changes to Render + reset the Supabase schema, including
+real SECRET_KEY and non-demo user passwords" / "keep going on Phase 1 —
+get the BAAs actually signed, get the risk assessment reviewed by someone
+qualified" / "let staff schedule a new mock appointment through the UI
+instead of only via seed.py" / "build the escalation queue screen for
+supervisors"]
 
 Please pick up from here.

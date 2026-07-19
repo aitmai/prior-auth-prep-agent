@@ -8,6 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- is documented to hold synthetic data only. Order doesn't matter (CASCADE).
 DROP TABLE IF EXISTS metrics_snapshot CASCADE;
 DROP TABLE IF EXISTS scheduled_appointments CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS denials CASCADE;
 DROP TABLE IF EXISTS drafts CASCADE;
 DROP TABLE IF EXISTS policy_check_results CASCADE;
@@ -136,6 +137,20 @@ CREATE TABLE denials (
 );
 
 CREATE INDEX idx_denials_case_id ON denials(case_id);
+
+-- ---------------------------------------------------------------------------
+-- users: real login. Role is stored for future RBAC enforcement but is NOT
+-- yet used to gate any specific action — no admin-only routes exist yet to
+-- gate. See CONTINUE.md.
+-- ---------------------------------------------------------------------------
+CREATE TABLE users (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username      VARCHAR(60)  NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role          VARCHAR(20)  NOT NULL DEFAULT 'staff'
+                  CHECK (role IN ('staff', 'supervisor', 'admin')),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
 
 -- ---------------------------------------------------------------------------
 -- scheduled_appointments: a MOCK stand-in for a real scheduling/EHR system.

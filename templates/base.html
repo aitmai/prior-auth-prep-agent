@@ -7,7 +7,16 @@
 <body>
   <div class="navbar">
     <span class="brand">Prior auth prep</span>
+    {% if current_user.is_authenticated %}
     <a href="{{ url_for('cases.queue') }}" class="{{ 'active' if request.path == '/' else '' }}">Queue</a>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:13px;color:var(--text-secondary);">{{ current_user.actor }}</span>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" style="padding:6px 12px;font-size:13px;">Log out</button>
+      </form>
+    </span>
+    {% endif %}
   </div>
   <div class="container">
     {% with messages = get_flashed_messages() %}

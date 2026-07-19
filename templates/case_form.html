@@ -19,6 +19,7 @@
 {% endif %}
 
 <form method="post" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   {% if prefill_appointment_id %}
   <input type="hidden" name="appointment_id" value="{{ prefill_appointment_id }}">
   {% endif %}
