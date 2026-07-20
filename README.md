@@ -38,7 +38,7 @@ Flask · PostgreSQL · Anthropic Claude API · Render
    ```
    python db/run_schema.py
    ```
-5. Load synthetic demo data:
+5. Load synthetic demo data (also creates 3 demo login accounts — see below):
    ```
    python db/seed.py
    ```
@@ -46,7 +46,20 @@ Flask · PostgreSQL · Anthropic Claude API · Render
    ```
    flask --app app run --debug
    ```
-7. Visit `http://localhost:5000` for the review queue.
+7. Visit `http://localhost:5000` — you'll land on the login page. Log in
+   with one of the demo accounts below, or set `ALLOW_DEMO_LOGIN=true` in
+   `.env` for a one-click "Test without login" button (local dev only —
+   see the Security note).
+
+## Demo login accounts
+
+Created by `db/seed.py`. Throwaway passwords, local/demo use only:
+
+| Username | Password | Role |
+|---|---|---|
+| `staff1` | `staffdemo123` | staff |
+| `supervisor1` | `supervisordemo123` | supervisor |
+| `admin1` | `admindemo123` | admin |
 
 ## Setting up DATABASE_URL
 
@@ -82,6 +95,7 @@ Either option, the schema and seed steps (steps 4–5 above) are identical. Avoi
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `ANTHROPIC_MODEL` | Optional, defaults to `claude-sonnet-5` |
 | `SECRET_KEY` | Flask session secret |
+| `ALLOW_DEMO_LOGIN` | Optional, defaults to `false`. Adds a "Test without login" button. Local dev only — never `true` on a real deployment. |
 
 ## Deploying to Render
 
@@ -89,7 +103,7 @@ Push to `github.com/aitmai/prior-auth-prep-agent`, connect the repo in Render as
 
 ## Security note
 
-All patient data in `db/seed.py` is synthetic. This prototype has no authentication layer and is not HIPAA-compliant as-is — do not point it at real patient data without adding access controls, encryption at rest/in transit, and a BAA-covered hosting environment.
+All patient data in `db/seed.py` is synthetic. This prototype has a real login layer (Flask-Login, hashed passwords, CSRF protection) but is still not HIPAA-compliant as-is — the seeded accounts use throwaway demo passwords, there's no role-based access enforcement yet, no MFA, and no BAA is in place with any vendor in the stack. Do not point it at real patient data without working through `REAL_WORLD_DESIGN_PLAN.md` Phase 1–2 and `docs/compliance/`. If `ALLOW_DEMO_LOGIN` is ever set to `true` outside local dev, it is a complete authentication bypass — see risk #13 in `docs/compliance/hipaa_risk_assessment.md`.
 
 ## Troubleshooting
 
